@@ -58,12 +58,19 @@ async function shareProject(id){
   snapshotActive();let p=projects.find(x=>x.id===id);if(!p)return;
   let payload={format:'Tischlerei-Fuhrmann-Tueren-Aufmass',formatVersion:1,exportedAt:nowIso(),project:p};
   let fn=(projectTitle(p).replace(/[^a-z0-9äöüß_-]+/gi,'_').replace(/^_+|_+$/g,'')||'Projekt')+'.tueren';
-  let file=new File([JSON.stringify(payload,null,2)],fn,{type:'application/json'});
+  // Android/Chrome accepts shared files more reliably with a standard MIME type.
+  let file=new File([JSON.stringify(payload,null,2)],fn,{type:'application/octet-stream'});
   try{
-    if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){await navigator.share({title:'Türen-Aufmaß – '+projectTitle(p),files:[file]});return;}
-  }catch(e){if(e && e.name==='AbortError')return;}
-  let a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  alert('Teilen wird von diesem Browser nicht unterstützt. Die Projektdatei wurde stattdessen heruntergeladen.');
+    if(!navigator.share)throw new Error('NO_SHARE');
+    if(navigator.canShare && !navigator.canShare({files:[file]}))throw new Error('NO_FILE_SHARE');
+    await navigator.share({title:'Türen-Aufmaß – '+projectTitle(p),text:'Projektdatei '+fn,files:[file]});
+    return;
+  }catch(e){
+    if(e && e.name==='AbortError')return;
+    let reason=(e&&e.message==='NO_SHARE')?'Die Teilen-Funktion ist in diesem Browser nicht verfügbar.':(e&&e.message==='NO_FILE_SHARE')?'Dieser Browser kann Dateien nicht über das Teilen-Menü weitergeben.':'Das Teilen-Menü konnte nicht geöffnet werden.';
+    if(!confirm(reason+'\n\nSoll die Projektdatei stattdessen in Downloads gespeichert werden?'))return;
+  }
+  let url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 function renderProjectList(){let box=$('projectList');if(!box)return;let sorted=[...projects].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));box.innerHTML=sorted.length?sorted.map(p=>`<div class='projectItem'><div><b>${esc(projectTitle(p))}${p.id===activeProjectId?' · aktuell':''}</b><div class='projectMeta'>${esc((p.fields||{}).city||'')}${(p.fields||{}).city?' · ':''}${(p.doors||[]).length} ${(p.doors||[]).length===1?'Tür':'Türen'} · zuletzt ${formatDate(p.updatedAt)}</div></div><div class='projectItemActions'><button onclick="loadProject('${p.id}')">Öffnen</button><button onclick="shareProject('${p.id}')">Teilen</button><button class='danger' onclick="deleteProject('${p.id}')">Löschen</button></div></div>`).join(''):'<p class="muted">Noch keine Projekte gespeichert.</p>'}
 function formatDate(v){try{return new Date(v).toLocaleString('de-AT',{dateStyle:'short',timeStyle:'short'})}catch(e){return ''}}
