@@ -1,0 +1,11 @@
+{
+  "name": "Türen-Aufmaß – Tischlerei Fuhrmann",
+  "short_name": "Türen-Aufmaß",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f9",
+  "theme_color": "#063c63",
+  "lang": "de-AT",
+  "description": "Türen-Aufmaß für Kundenprojekte"
+}
