@@ -27,7 +27,7 @@
 <div class='field'><label>5. Türhöhe [mm]</label><input id='height' type='number'><div class='suggest' id='heightHint'></div></div></div>
 <div class='lower'><div class='field'><label>6. Weitere Maße (optional)</label><div class='rbl'><input id='rblb' type='number' placeholder='RBL Breite'><input id='rblh' type='number' placeholder='RBL Höhe'></div><div class='suggest' id='normHint'></div></div><div class='field'><label>7. Schloss</label><div class='toggle'><button class='lock sel' data-v='BB'>BB</button><button class='lock' data-v='WC'>WC</button><button class='lock' data-v='PZ'>PZ</button></div></div><div class='field'><label>8. Glas (optional)</label><select id='glass'><option value=''>ohne Glas</option><option>Glasausschnitt</option><option>Ganzglastüre</option></select><input id='glassType' placeholder='Glasart, z.B. Satinato / Klar' style='margin-top:6px;display:none'></div><div class='field'><label>9. Öffnungsrichtung (optional)</label><select id='opening'><option value=''>– nicht angegeben –</option><option>in den Raum</option><option>nach außen</option></select></div></div>
 <label style='font-weight:bold;display:block;margin-top:12px'>10. Notiz (optional)</label><textarea class='note' id='note' rows='2'></textarea><div class='actions'><button id='clear'>Abbrechen / leeren</button><button class='primary' id='save'>✓ Als neue Tür übernehmen</button></div></section></main>
-<div id='projectModal' class='modalBack hidden'><div class='modal'><div class='modalHead'><b>Projekte</b><button id='closeProjects' type='button'>✕</button></div><div class='modalBody'><div class='modalActions'><button class='primary' id='newProject' type='button'>＋ Neues Projekt</button><button id='importProject' type='button'>Projekt importieren</button><input id='importFile' type='file' accept='.tueren,.json,application/json' hidden></div><div id='projectList'></div></div></div></div>
+<div id='projectModal' class='modalBack hidden'><div class='modal'><div class='modalHead'><b>Projekte</b><button id='closeProjects' type='button'>✕</button></div><div class='modalBody'><div class='modalActions'><button class='primary' id='newProject' type='button'>＋ Neues Projekt</button><button id='importProject' type='button'>Projekt importieren</button><input id='importFile' type='file' accept='.tueren,.json,.txt,application/json,text/plain' hidden></div><div id='projectList'></div></div></div></div>
 <script>
 const $=id=>document.getElementById(id), keys=['name','address','city','phone','email','project','v1a','v1b','v2a','v2b','generalNote','defMst','defHeight'];
 // Samsung/Android can block localStorage when an HTML file is opened directly from My Files/content://.
@@ -57,17 +57,19 @@ function deleteProject(id){let p=projects.find(x=>x.id===id);if(!p)return;if(!co
 async function shareProject(id){
   snapshotActive();let p=projects.find(x=>x.id===id);if(!p)return;
   let payload={format:'Tischlerei-Fuhrmann-Tueren-Aufmass',formatVersion:1,exportedAt:nowIso(),project:p};
-  let fn=(projectTitle(p).replace(/[^a-z0-9äöüß_-]+/gi,'_').replace(/^_+|_+$/g,'')||'Projekt')+'.tueren';
-  // Android/Chrome accepts shared files more reliably with a standard MIME type.
-  let file=new File([JSON.stringify(payload,null,2)],fn,{type:'application/octet-stream'});
+  let base=(projectTitle(p).replace(/[^a-z0-9äöüß_-]+/gi,'_').replace(/^_+|_+$/g,'')||'Projekt');
+  // Android/Chrome teilt bekannte Standard-Dateitypen deutlich zuverlässiger als eigene Endungen.
+  // Der Inhalt bleibt unverändert die vollständige Türen-Aufmaß-Projektdatei.
+  let fn=base+'_Tueren-Aufmass.txt';
+  let file=new File([JSON.stringify(payload,null,2)],fn,{type:'text/plain'});
   try{
-    if(!navigator.share)throw new Error('NO_SHARE');
-    if(navigator.canShare && !navigator.canShare({files:[file]}))throw new Error('NO_FILE_SHARE');
-    await navigator.share({title:'Türen-Aufmaß – '+projectTitle(p),text:'Projektdatei '+fn,files:[file]});
+    if(typeof navigator.share!=='function')throw new Error('NO_SHARE');
+    if(typeof navigator.canShare==='function' && !navigator.canShare({files:[file]}))throw new Error('NO_FILE_SHARE');
+    await navigator.share({title:'Türen-Aufmaß – '+projectTitle(p),files:[file]});
     return;
   }catch(e){
     if(e && e.name==='AbortError')return;
-    let reason=(e&&e.message==='NO_SHARE')?'Die Teilen-Funktion ist in diesem Browser nicht verfügbar.':(e&&e.message==='NO_FILE_SHARE')?'Dieser Browser kann Dateien nicht über das Teilen-Menü weitergeben.':'Das Teilen-Menü konnte nicht geöffnet werden.';
+    let reason=(e&&e.message==='NO_SHARE')?'Die Teilen-Funktion ist in diesem Browser nicht verfügbar.':(e&&e.message==='NO_FILE_SHARE')?'Dieses Gerät gibt auch Standard-Dateien nicht an das Android-Teilen-Menü weiter.':'Das Android-Teilen-Menü konnte nicht geöffnet werden.';
     if(!confirm(reason+'\n\nSoll die Projektdatei stattdessen in Downloads gespeichert werden?'))return;
   }
   let url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
